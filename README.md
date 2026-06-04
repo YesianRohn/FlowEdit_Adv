@@ -1,70 +1,158 @@
-[![Zero-Shot Image Editing](https://img.shields.io/badge/zero%20shot-image%20editing-Green)]([https://github.com/topics/video-editing](https://github.com/topics/text-guided-image-editing))
-[![Python](https://img.shields.io/badge/python-3.8+-blue?python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)](https://www.python.org/downloads/release/python-38/)
-![PyTorch](https://img.shields.io/badge/torch-2.0.0-red?PyTorch-%23EE4C2C.svg?style=for-the-badge&logo=PyTorch&logoColor=white)
+# FlowEdit-Advanced
 
-# FlowEdit
+[Original Project](https://matankleiner.github.io/flowedit/) | [Arxiv](https://arxiv.org/abs/2412.08629) | [Original Repo](https://github.com/fallenshock/FlowEdit) | [Demo](https://huggingface.co/spaces/fallenshock/FlowEdit)
 
-[Project](https://matankleiner.github.io/flowedit/) | [Arxiv](https://arxiv.org/abs/2412.08629) | [Proceedings](https://openaccess.thecvf.com/content/ICCV2025/html/Kulikov_FlowEdit_Inversion-Free_Text-Based_Editing_Using_Pre-Trained_Flow_Models_ICCV_2025_paper.html) | [Demo](https://huggingface.co/spaces/fallenshock/FlowEdit) | [ComfyUI](#comfyui-implementation-for-different-models) | [Data](https://github.com/fallenshock/FlowEdit/tree/main/Data)
+**Extended PyTorch implementation** of [FlowEdit: Inversion-Free Text-Based Editing Using Pre-Trained Flow Models](https://arxiv.org/abs/2412.08629) (ICCV 2025 Best Student Paper), with additional support for **FLUX.2 [klein] 4B** and **Z-Image / Z-Image-Turbo 6B**.
 
-#### [Recorded Talk](https://www.youtube.com/live/2fEDy-uTAII?si=_NRbANcqgX9wyvcI&t=17998)
+> This repo is built on top of [fallenshock/FlowEdit](https://github.com/fallenshock/FlowEdit). The original implementation supports Stable Diffusion 3 and FLUX.1; we extend it to two additional state-of-the-art rectified-flow models.
 
-### [ICCV 2025 Best Student Paper] Official Pytorch implementation of the paper: "FlowEdit: Inversion-Free Text-Based Editing Using Pre-Trained Flow Models"
+---
 
+## What's New
 
-![](imgs/teaser.png)
+| Model | Size | Type | CFG | Script |
+|---|---|---|---|---|
+| **FLUX.2 [klein]** | 4B | Distilled rectified-flow | Off (distilled) | `run_flux2_klein.py` |
+| **Z-Image / Z-Image-Turbo** | 6B | Rectified-flow (base / distilled) | Optional (off for Turbo) | `run_zimage.py` |
+
+Key differences from the original FlowEdit:
+
+- **FLUX.2 [klein]**: No `pooled_projections` or guidance embeddings; uses 2×2 patchify + BatchNorm normalisation; supports optional real CFG for non-distilled variants.
+- **Z-Image**: Transformer expects 5D latents with per-sample prompt embeddings; sign-flipped velocity output; uses VAE shift/scaling factor for latent space conversion.
+
+---
 
 ## Installation
-1. Clone the repository
 
-2. Install the required dependencies using `pip install torch diffusers transformers accelerate sentencepiece protobuf` <br>
-	* New version of diffusers may have compatibility issues, try install `diffusers==0.30.1`
- 	* Tested with CUDA version 12.4 and diffusers 0.30.0
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/<your-username>/FlowEdit-Advanced.git
+   cd FlowEdit-Advanced
+   ```
 
-## Running examples
-Run editing with Stable Diffusion 3: `python run_script.py --exp_yaml SD3_exp.yaml`
+2. Install dependencies:
+   ```bash
+   pip install torch diffusers transformers accelerate sentencepiece protobuf
+   ```
 
-Run editing with Flux: `python run_script.py --exp_yaml FLUX_exp.yaml`
+   > **Note:** FLUX.2 [klein] and Z-Image require a recent `diffusers`. If the pipeline classes are not found, install from source:
+   > ```bash
+   > pip install -U git+https://github.com/huggingface/diffusers.git
+   > ```
+   > Tested with CUDA 12.4 and `diffusers >= 0.36`.
 
-## Usage - your own examples
+---
 
-* Upload images to `example_images` folder. 
+## Quick Start
 
-* Create an edits file that specifies: (a) a path to the input image, (b) a source prompt, (c) target prompts, and (d) target codes. The target codes summarize the changes between the source and target prompts and will appear in the output filename. <br>
-See `edits.yaml` for example.
+### FLUX.2 [klein] 4B
 
-* Create an experiment file containing the hyperparamaters needed for running FlowEdit, such as `n_max`, `n_min`. This file also includes the path to the `edits.yaml` file<br>
-See `FLUX_exp.yaml` for FLUX usage example and `SD3_exp.yaml` for Stable Diffusion 3 usage example. <br>
-For a detailed discussion on the impact of different hyperparameters and the values we used, please refer to our paper.
+```bash
+python run_flux2_klein.py \
+    --input_img example_images/lighthouse.png \
+    --src_prompt "a tall white lighthouse on a hill, blue sky" \
+    --tar_prompt "Big Ben clock tower on a hill, blue sky" \
+    --output edited.png
+```
 
-Run `python run_script.py --exp_yaml <path to your experiment yaml>`
+### Z-Image / Z-Image-Turbo 6B
 
-## ComfyUI implementation for different models 
+```bash
+python run_zimage.py \
+    --input_img example_images/lighthouse.png \
+    --src_prompt "a tall white lighthouse on a hill, blue sky" \
+    --tar_prompt "Big Ben clock tower on a hill, blue sky" \
+    --output edited.png
+```
 
-* [FLUX](https://github.com/logtd/ComfyUI-Fluxtapoz)
-* [HunyuanLoom](https://github.com/logtd/ComfyUI-HunyuanLoom)
+To use the non-distilled Z-Image base model (supports CFG):
 
-Implemented by [logtd](https://x.com/logtdx/status/1869095838016012462?s=48&t=6Yj6BZKooDOmH_JWRWjtHg)
+```bash
+python run_zimage.py \
+    --model_id Tongyi-MAI/Z-Image \
+    --src_guidance_scale 3.0 \
+    --tar_guidance_scale 7.0 \
+    --input_img example_images/lighthouse.png \
+    --src_prompt "a tall white lighthouse on a hill, blue sky" \
+    --tar_prompt "Big Ben clock tower on a hill, blue sky" \
+    --output edited.png
+```
 
-LTX-Video ComfyUI implementation can be found in LTX-Video [official repository](https://github.com/Lightricks/ComfyUI-LTXVideo/tree/master?tab=readme-ov-file#flow-edit).
+---
 
-## Community and Follow-Up Work
+## Usage – Your Own Examples
 
-* [Training-Free-WAN-Editing🤗](https://github.com/KyujinHan/Awesome-Training-Free-WAN2.1-Editing), combines [WAN2.1](https://github.com/Wan-Video/Wan2.1) with FlowEdit to extend training-free to video editing. If you are interested in video editing, please feel free to take a look. Implemented by [Kyujinpy](https://github.com/KyujinHan).
+1. Place your input image in the `example_images/` folder (or anywhere on disk).
 
-* DNAEdit refines the Gaussian noise in the noise domain, improving image and video editing (NeurIPS 2025 Spotlight). [Project](https://xiechenxi99.github.io/DNAEdit/) | [Code](https://github.com/xiechenxi99/DNAEdit_code) | [Arxiv](https://arxiv.org/abs/2506.01430) | [Proceedings](https://neurips.cc/virtual/2025/loc/san-diego/poster/118684)
+2. Choose the appropriate script and provide the required arguments:
 
-* FlowAlign add optimal control-based trajectory control to the inversion free process (ICLR 2026). [Code](https://github.com/FlowAlign/FlowAlign) | [Arxiv](https://arxiv.org/abs/2505.23145) | [Proceedings](https://openreview.net/forum?id=nyttIJfwW7) 
+   | Argument | Description |
+   |---|---|
+   | `--input_img` | Path to the input image |
+   | `--src_prompt` | Text describing the input image |
+   | `--tar_prompt` | Text describing the desired edit |
+   | `--output` | Output image path |
+   | `--negative_prompt` | Optional negative prompt (only effective when CFG > 1) |
+   | `--model_id` | HuggingFace model id or local path |
+   | `--cpu_offload` | Enable CPU offload to save VRAM |
 
-* DynaEdit extened FlowEdit for dynmaic video editing. [Project](https://dynaedit.github.io/) | [Arxiv](https://arxiv.org/abs/2603.17989)
-  
-## License
-This project is licensed under the [MIT License](LICENSE).
+3. Tune FlowEdit hyper-parameters:
 
+   | Parameter | Default (FLUX.2) | Default (Z-Image) | Description |
+   |---|---|---|---|
+   | `--T_steps` | 28 | 28 | Total ODE steps |
+   | `--n_max` | 24 | 24 | Largest noise level used (higher → more deviation) |
+   | `--n_min` | 0 | 0 | Final SDEdit-refinement steps |
+   | `--n_avg` | 1 | 1 | Velocity samples averaged per step |
+   | `--src_guidance_scale` | 1.0 | 1.0 | CFG scale for source (1.0 = off for distilled) |
+   | `--tar_guidance_scale` | 1.0 | 1.0 | CFG scale for target |
 
-### Citation
-If you use this code for your research, please cite our paper:
+   For a detailed discussion of hyper-parameters, refer to the [original paper](https://arxiv.org/abs/2412.08629).
+
+---
+
+## Supported Models Summary
+
+| Model | Pipeline Class | VRAM (bf16) | CFG | Notes |
+|---|---|---|---|---|
+| SD3 | `StableDiffusion3Pipeline` | ~12 GB | Yes | Original FlowEdit |
+| FLUX.1 | `FluxPipeline` | ~16 GB | Yes | Original FlowEdit |
+| **FLUX.2 [klein] 4B** | `Flux2KleinPipeline` | ~13 GB | Optional | New ✨ |
+| **Z-Image / Turbo 6B** | `ZImagePipeline` | ~14 GB | Optional | New ✨ |
+
+---
+
+## Project Structure
 
 ```
+FlowEdit-Advanced/
+├── FlowEdit_utils.py       # Core algorithms: FlowEditSD3, FlowEditFLUX, FlowEditFLUX2Klein, FlowEditZImage
+├── run_flux2_klein.py      # Runner script for FLUX.2 [klein] 4B
+├── run_zimage.py           # Runner script for Z-Image / Z-Image-Turbo
+└── example_images/         # Sample images for testing
+```
+
+---
+
+## Acknowledgements
+
+- [FlowEdit](https://github.com/fallenshock/FlowEdit) — Original implementation by Kulikov et al.
+- [FLUX.2 [klein]](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B) — Black Forest Labs
+- [Z-Image](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo) — Tongyi-MAI (通义万相)
+
+---
+
+## License
+
+This project is licensed under the [MIT License](https://opensource.org/licenses/MIT), consistent with the original FlowEdit repository.
+
+---
+
+## Citation
+
+If you use this code, please cite the original FlowEdit paper:
+
+```bibtex
 @inproceedings{kulikov2025flowedit,
   title={Flowedit: Inversion-free text-based editing using pre-trained flow models},
   author={Kulikov, Vladimir and Kleiner, Matan and Huberman-Spiegelglas, Inbar and Michaeli, Tomer},
